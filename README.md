@@ -68,6 +68,120 @@ Detects unnaturally long silences in generated audio using Silero VAD with RMS a
 - Total duration analysis
 - Silence-to-speech ratio calculations
 
+## Using as a Library
+
+### Installation
+
+```bash
+pip install audioevals
+```
+
+### Basic Usage
+
+```python
+import asyncio
+from audioevals.evals import wer_eval, audiobox_eval, vad_eval
+from audioevals.utils.audio import AudioData
+
+# Load audio data
+audio_data = AudioData.from_wav_file("/path/to/audio.wav")
+transcript = "Hello world, this is a test."
+```
+
+### WER Evaluation
+
+```python
+# Using file path
+wer_result = await wer_eval.run_single_file("/path/to/audio.wav", transcript)
+print(f"WER: {wer_result['wer_score']:.2f}%")
+print(f"STT: {wer_result['stt_transcript']}")
+
+# Using AudioData instance
+wer_result = await wer_eval.run_audio_data(audio_data, transcript)
+print(f"WER: {wer_result['wer_score']:.2f}%")
+```
+
+### AudioBox Aesthetics Evaluation
+
+```python
+# Using file path
+audiobox_result = audiobox_eval.run_single_file("/path/to/audio.wav")
+print(f"Content Enjoyment: {audiobox_result['CE']:.2f}")
+print(f"Production Quality: {audiobox_result['PQ']:.2f}")
+
+# Using AudioData instance
+audiobox_result = audiobox_eval.run_audio_data(audio_data)
+print(f"Content Enjoyment: {audiobox_result['CE']:.2f}")
+```
+
+### VAD Silence Evaluation
+
+```python
+# Using file path
+vad_result = vad_eval.run_single_file("/path/to/audio.wav")
+print(f"Max silence duration: {vad_result['max_silence_duration']:.2f}s")
+print(f"Silence/Speech ratio: {vad_result['silence_to_speech_ratio']:.2f}")
+
+# Using AudioData instance
+vad_result = vad_eval.run_audio_data(audio_data)
+print(f"Max silence duration: {vad_result['max_silence_duration']:.2f}s")
+```
+
+### Complete Example
+
+```python
+import asyncio
+from audioevals.evals import wer_eval, audiobox_eval, vad_eval
+from audioevals.utils.audio import AudioData
+
+async def evaluate_audio_file(file_path, transcript):
+    """Complete evaluation of an audio file"""
+    
+    # Load audio data once
+    audio_data = AudioData.from_wav_file(file_path)
+    
+    # Run all evaluations
+    wer_result = await wer_eval.run_audio_data(audio_data, transcript)
+    audiobox_result = audiobox_eval.run_audio_data(audio_data)
+    vad_result = vad_eval.run_audio_data(audio_data)
+    
+    return {
+        'wer': wer_result,
+        'audiobox': audiobox_result,
+        'vad': vad_result
+    }
+
+# Usage
+results = asyncio.run(evaluate_audio_file(
+    "/path/to/audio.wav", 
+    "Hello world, this is a test."
+))
+
+print(f"WER: {results['wer']['wer_score']:.2f}%")
+print(f"AudioBox PQ: {results['audiobox']['PQ']:.2f}")
+print(f"Max silence: {results['vad']['max_silence_duration']:.2f}s")
+```
+
+## CLI Usage
+
+You can also run evaluations on datasets using the command line interface:
+
+```bash
+audioevals --dataset {folder_name}
+```
+
+The results will be printed to console as well as saved to `{folder_name}/results.json` for inspection via something like jupyter notebook.
+
+### Running Specific Evaluations
+
+By default, the tool will run all the available evaluations, like WER, AudioBox aesthetics, VAD Silence. But it's possible to run only a select few with the `--evals` flag:
+
+```bash
+audioevals --dataset {folder_name} --evals wer vad
+```
+
+Available options are: `wer`, `audiobox`, `vad`
+
 ## Output
 
 Results are saved to `{folder_name}/results.json` and include:
