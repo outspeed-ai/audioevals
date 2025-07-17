@@ -1,0 +1,27 @@
+[project]
+name = "audioevals"
+version = "0.1.0"
+description = "Effective evaluations for Text-to-Speech (TTS) systems"
+readme = "README.md"
+authors = [
+    { name = "Sayan Jyoti Das", email = "sayanjyotidasworkmail@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.12.14",
+    "audiobox-aesthetics>=0.0.4",
+    "av>=15.0.0",
+    "jiwer>=4.0.0",
+    "numpy>=2.3.1",
+    "onnxruntime>=1.22.1",
+    "pydub>=0.25.1",
+    "soundfile>=0.13.1",
+    "soxr>=0.5.0.post1",
+]
+
+[project.scripts]
+audioevals = "audioevals.run_evals:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
