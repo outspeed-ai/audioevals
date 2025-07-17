@@ -5,6 +5,7 @@ import aiohttp
 import jiwer
 
 from audioevals.utils.audio import AudioData
+from typing import Dict, List, Optional, Tuple
 
 
 def normalize_text(text: str) -> str:
@@ -25,7 +26,7 @@ def get_similarity_score(reference: str, hypothesis: str) -> float:
 
 async def request_deepgram_stt(
     audio_data: AudioData,
-) -> str | None:
+) -> Optional[Tuple[str, List[Dict]]]:
     try:
         query_params = {
             "model": "nova-3",
@@ -45,10 +46,13 @@ async def request_deepgram_stt(
                 data=audio_data.get_wav_file_object(),
             ) as response:
                 json_response = await response.json()
-                text = json_response["results"]["channels"][0]["alternatives"][0][
-                    "transcript"
-                ]
-                return text
+                
+                # Extract transcript and word-level timestamps
+                alternative = json_response["results"]["channels"][0]["alternatives"][0]
+                transcript = alternative["transcript"]
+                word_timestamps = alternative.get("words", [])
+                
+                return transcript, word_timestamps
     except Exception as e:
         print(f"Error in STT inference (deepgram): {str(e)}")
         return None

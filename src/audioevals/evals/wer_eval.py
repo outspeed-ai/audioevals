@@ -10,6 +10,21 @@ from audioevals.utils.common import get_similarity_score, normalize_text, reques
 from audioevals.utils.audio import AudioData
 
 
+def calculate_words_per_second(word_timestamps: List[Dict]) -> float:
+    if not word_timestamps:
+        return 0.0
+    
+    # Get the total duration from first word start to last word end
+    total_duration = word_timestamps[-1]["end"] - word_timestamps[0]["start"]
+    
+    if total_duration <= 0:
+        return 0.0
+    
+    # Calculate words per second
+    words_per_second = len(word_timestamps) / total_duration
+    return words_per_second
+
+
 async def run(
     audio_dir: str,
     transcripts_file: Optional[str] = None,
@@ -26,6 +41,7 @@ async def run(
                     "audio_file": str,
                     "stt_transcript": str,
                     "wer_score": float,
+                    "words_per_second": float,
                 }
             ]
         }
@@ -67,6 +83,7 @@ async def run(
             "audio_file": str(audio_file),
             "stt_transcript": "",
             "wer_score": 0.0,
+            "words_per_second": 0.0,
         }
 
         try:
@@ -83,11 +100,12 @@ async def run(
 
             result["stt_transcript"] = wer_result["stt_transcript"]
             result["wer_score"] = wer_result["wer_score"]
+            result["words_per_second"] = wer_result["words_per_second"]
 
             wer_scores.append(wer_result["wer_score"])
             results["successful_evaluations"] += 1
 
-            print(f'  ✅ WER: {wer_result["wer_score"]:.2f}% | STT: "{wer_result["stt_transcript"]}"')
+            print(f'  ✅ WER: {wer_result["wer_score"]:.2f}% | WPS: {wer_result["words_per_second"]:.2f} | STT: "{wer_result["stt_transcript"]}"')
 
         except Exception as e:
             error_msg = str(e)
@@ -120,6 +138,7 @@ async def run_single_file(audio_file_path: str, ground_truth_transcript: str) ->
         {
             "stt_transcript": str,
             "wer_score": float,
+            "words_per_second": float,
         }
     """
     audio_data = AudioData.from_wav_file(audio_file_path)
@@ -132,23 +151,33 @@ async def run_audio_data(audio_data: AudioData, ground_truth_transcript: str) ->
         {
             "stt_transcript": str,
             "wer_score": float,
+            "words_per_second": float,
         }
     """
     result = {
         "stt_transcript": "",
         "wer_score": 0.0,
+        "words_per_second": 0.0,
     }
     
     # Run STT
-    stt_transcript = await request_deepgram_stt(audio_data)
+    stt_result = await request_deepgram_stt(audio_data)
     
-    if stt_transcript is None:
+    if stt_result is None:
         raise Exception("STT returned None - transcription failed")
     
+    stt_transcript, word_timestamps = stt_result
     result["stt_transcript"] = normalize_text(stt_transcript)
     
     # Calculate WER
     wer_score = get_similarity_score(ground_truth_transcript, stt_transcript)
     result["wer_score"] = wer_score
+    
+    # Calculate words spoken per second
+    if word_timestamps:
+        words_per_second = calculate_words_per_second(word_timestamps)
+        result["words_per_second"] = words_per_second
+    else:
+        result["words_per_second"] = 0.0
     
     return result

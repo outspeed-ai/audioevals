@@ -71,6 +71,7 @@ async def run_evaluations(
                         if eval_item["audio_file"] == audio_file:
                             eval_item["stt_transcript"] = result["stt_transcript"]
                             eval_item["wer"] = result["wer_score"]
+                            eval_item["words_per_second"] = result["words_per_second"]
                             break
 
             elif eval_type == "audiobox":
@@ -131,10 +132,18 @@ async def run_evaluations(
         wer_scores = [
             item["wer"] for item in results["evaluations"] if "wer" in item
         ]
+        words_per_second_scores = [
+            item["words_per_second"] for item in results["evaluations"] if "words_per_second" in item
+        ]
         if wer_scores:
             avg_wer = sum(wer_scores) / len(wer_scores)
             print(
                 f"🎯 WER: Average {avg_wer:.2f}%, Range {min(wer_scores):.2f}%-{max(wer_scores):.2f}%"
+            )
+        if words_per_second_scores:
+            avg_wps = sum(words_per_second_scores) / len(words_per_second_scores)
+            print(
+                f"🗣️ Words/Second: Average {avg_wps:.2f}, Range {min(words_per_second_scores):.2f}-{max(words_per_second_scores):.2f}"
             )
 
     if "audiobox" in eval_types:
