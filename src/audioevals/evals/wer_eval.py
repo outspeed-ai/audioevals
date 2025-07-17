@@ -79,22 +79,15 @@ async def run(
             # Load audio data
             audio_data = AudioData.from_wav_file(str(audio_file))
 
-            # Run STT
-            stt_transcript = await request_deepgram_stt(audio_data)
+            wer_result = await run_audio_data(audio_data, ground_truth)
 
-            if stt_transcript is None:
-                raise Exception("STT returned None - transcription failed")
+            result["stt_transcript"] = wer_result["stt_transcript"]
+            result["wer_score"] = wer_result["wer_score"]
 
-            result["stt_transcript"] = normalize_text(stt_transcript)
-
-            # Calculate WER
-            wer_score = get_similarity_score(ground_truth, stt_transcript)
-            result["wer_score"] = wer_score
-
-            wer_scores.append(wer_score)
+            wer_scores.append(wer_result["wer_score"])
             results["successful_evaluations"] += 1
 
-            print(f'  ✅ WER: {wer_score:.2f}% | STT: "{stt_transcript}"')
+            print(f'  ✅ WER: {wer_result["wer_score"]:.2f}% | STT: "{wer_result["stt_transcript"]}"')
 
         except Exception as e:
             error_msg = str(e)
@@ -119,3 +112,43 @@ async def run(
     print("-" * 50)
 
     return results
+
+
+async def run_single_file(audio_file_path: str, ground_truth_transcript: str) -> Dict:
+    """
+    Returns:
+        {
+            "stt_transcript": str,
+            "wer_score": float,
+        }
+    """
+    audio_data = AudioData.from_wav_file(audio_file_path)
+    return await run_audio_data(audio_data, ground_truth_transcript)
+
+
+async def run_audio_data(audio_data: AudioData, ground_truth_transcript: str) -> Dict:
+    """
+    Returns:
+        {
+            "stt_transcript": str,
+            "wer_score": float,
+        }
+    """
+    result = {
+        "stt_transcript": "",
+        "wer_score": 0.0,
+    }
+    
+    # Run STT
+    stt_transcript = await request_deepgram_stt(audio_data)
+    
+    if stt_transcript is None:
+        raise Exception("STT returned None - transcription failed")
+    
+    result["stt_transcript"] = normalize_text(stt_transcript)
+    
+    # Calculate WER
+    wer_score = get_similarity_score(ground_truth_transcript, stt_transcript)
+    result["wer_score"] = wer_score
+    
+    return result

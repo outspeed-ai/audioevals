@@ -2,8 +2,10 @@ import json
 import sys
 from pathlib import Path
 from typing import Dict, Optional
-
+import numpy as np
+from audioevals.utils.audio import AudioData
 from audiobox_aesthetics.infer import initialize_predictor
+import torch
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
@@ -149,3 +151,50 @@ def run(
     print("-" * 50)
 
     return results
+
+
+def run_single_file(audio_file_path: str) -> Dict:
+    """
+    Returns:
+        {
+            "CE": float,
+            "CU": float,
+            "PC": float,
+            "PQ": float,
+        }
+    """
+    audio_data = AudioData.from_wav_file(audio_file_path)
+    return run_audio_data(audio_data)
+
+
+def run_audio_data(audio_data: AudioData) -> Dict:
+    """
+    Returns:
+        {
+            "CE": float,
+            "CU": float,
+            "PC": float,
+            "PQ": float,
+        }
+    """
+    result = {
+        "CE": 0.0,
+        "CU": 0.0,
+        "PC": 0.0,
+        "PQ": 0.0,
+    }
+    
+    # Initialize the predictor
+    predictor = initialize_predictor()
+    
+    # Convert to torch tensor
+    audio_tensor = torch.from_numpy(audio_data.get_1d_array(dtype=np.float32)).unsqueeze(0)
+    
+    prediction = predictor.forward([{"path": audio_tensor, "sample_rate": audio_data.sample_rate}])[0]
+    
+    result["CE"] = prediction["CE"]
+    result["CU"] = prediction["CU"]
+    result["PC"] = prediction["PC"]
+    result["PQ"] = prediction["PQ"]
+    
+    return result

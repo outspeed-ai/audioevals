@@ -57,9 +57,6 @@ def run(
     print(f"Total files to evaluate: {len(ground_truth_transcripts)}")
     print("-" * 50)
 
-    # Initialize Silero VAD model for 16kHz
-    vad_model = SileroVADModel(sample_rate=16000)
-    
     max_silence_durations = []
     silence_to_speech_ratios = []
 
@@ -78,44 +75,17 @@ def run(
 
             audio_data = AudioData.from_wav_file(str(audio_file))
             
-            # Resample to 16kHz if needed
-            if audio_data.sample_rate != 16000:
-                audio_data = audio_data.resample(16000)
+            # Delegate to run_audio_data for processing
+            vad_result = run_audio_data(audio_data)
             
-            audio_array = audio_data.get_1d_array(np.float32)
+            result["max_silence_duration"] = vad_result["max_silence_duration"]
+            result["silence_to_speech_ratio"] = vad_result["silence_to_speech_ratio"]
             
-            vad_model.reset_states()
-            
-            chunk_size = 512
-            speech_detection_results = []
-            
-            # Pad audio if needed
-            if len(audio_array) % chunk_size != 0:
-                padding_size = chunk_size - (len(audio_array) % chunk_size)
-                audio_array = np.pad(audio_array, (0, padding_size), mode='constant')
-            
-            for i in range(0, len(audio_array), chunk_size):
-                chunk = audio_array[i:i + chunk_size]
-                if len(chunk) == chunk_size:
-                    vad_score = vad_model(chunk)
-                    rms_value = calculate_rms(chunk)
-                    
-                    is_speech = vad_score >= 0.5 and rms_value >= 0.001
-                    speech_detection_results.append(is_speech)
-            
-            # Calculate silence and speech durations
-            max_silence_duration, silence_to_speech_ratio = calculate_silence_metrics(
-                speech_detection_results, chunk_duration_ms=32
-            )
-            
-            result["max_silence_duration"] = max_silence_duration
-            result["silence_to_speech_ratio"] = silence_to_speech_ratio
-            
-            max_silence_durations.append(max_silence_duration)
-            silence_to_speech_ratios.append(silence_to_speech_ratio)
+            max_silence_durations.append(vad_result["max_silence_duration"])
+            silence_to_speech_ratios.append(vad_result["silence_to_speech_ratio"])
             results["successful_evaluations"] += 1
             
-            print(f"  ✅ Max silence: {max_silence_duration:.2f}s | Silence/Speech ratio: {silence_to_speech_ratio:.2f}")
+            print(f"  ✅ Max silence: {vad_result['max_silence_duration']:.2f}s | Silence/Speech ratio: {vad_result['silence_to_speech_ratio']:.2f}")
 
         except Exception as e:
             error_msg = str(e)
@@ -170,3 +140,80 @@ def calculate_silence_metrics(speech_detection_results: List[bool], chunk_durati
         silence_to_speech_ratio = float('inf') if total_silence_chunks > 0 else 0.0
     
     return max_silence_duration, silence_to_speech_ratio
+
+
+def run_single_file(audio_file_path: str) -> Dict:
+    """
+    Returns:
+        {
+            "max_silence_duration": float,
+            "total_duration": float,
+            "silence_to_speech_ratio": float,
+        }
+    """
+    audio_data = AudioData.from_wav_file(audio_file_path)
+    return run_audio_data(audio_data)
+
+
+def run_audio_data(audio_data: AudioData) -> Dict:
+    """
+    Returns:
+        {
+            "max_silence_duration": float,
+            "total_duration": float,
+            "silence_to_speech_ratio": float,
+        }
+    """
+    result = {
+        "max_silence_duration": 0.0,
+        "total_duration": 0.0,
+        "silence_to_speech_ratio": 0.0,
+    }
+    
+    # Resample to 16kHz if needed
+    if audio_data.sample_rate != 16000:
+        audio_data = audio_data.resample(16000)
+    
+    # Get audio as float32 for VAD processing
+    audio_array = audio_data.get_1d_array(np.float32)
+    
+    # Calculate total duration
+    total_duration = len(audio_array) / 16000.0
+    result["total_duration"] = total_duration
+    
+    # Initialize Silero VAD model for 16kHz
+    vad_model = SileroVADModel(sample_rate=16000)
+    vad_model.reset_states()
+    
+    # Process audio in 32ms chunks (512 samples at 16kHz)
+    chunk_size = 512
+    speech_detection_results = []
+    
+    # Pad audio if needed to ensure we can process all samples
+    if len(audio_array) % chunk_size != 0:
+        padding_size = chunk_size - (len(audio_array) % chunk_size)
+        audio_array = np.pad(audio_array, (0, padding_size), mode='constant')
+    
+    # Process audio in chunks
+    for i in range(0, len(audio_array), chunk_size):
+        chunk = audio_array[i:i + chunk_size]
+        if len(chunk) == chunk_size:
+            # Get VAD score
+            vad_score = vad_model(chunk)
+            
+            # Calculate RMS for this chunk
+            rms_value = calculate_rms(chunk)
+            
+            # Speech detected if both VAD and RMS thresholds are met
+            is_speech = vad_score >= 0.5 and rms_value >= 0.001
+            speech_detection_results.append(is_speech)
+    
+    # Calculate silence and speech durations
+    max_silence_duration, silence_to_speech_ratio = calculate_silence_metrics(
+        speech_detection_results, chunk_duration_ms=32
+    )
+    
+    result["max_silence_duration"] = max_silence_duration
+    result["silence_to_speech_ratio"] = silence_to_speech_ratio
+    
+    return result
