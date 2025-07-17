@@ -95,6 +95,7 @@ transcript = "Hello world, this is a test."
 wer_result = await wer_eval.run_single_file("/path/to/audio.wav", transcript)
 print(f"WER: {wer_result['wer_score']:.2f}%")
 print(f"STT: {wer_result['stt_transcript']}")
+print(f"Words Per Second: {wer_result['words_per_second']}")
 
 # Using AudioData instance
 wer_result = await wer_eval.run_audio_data(audio_data, transcript)
