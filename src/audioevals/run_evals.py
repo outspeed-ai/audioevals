@@ -243,6 +243,58 @@ async def run_evaluations(
     print(f"\n💾 Results saved to: {results_file}")
 
 
+def run_single_file_evaluations(
+    file_path: str,
+    eval_types: Optional[List[str]] = None,
+):
+    if eval_types is None:
+        eval_types = EVAL_TYPES
+    
+    # Skip WER evaluation for single file mode (requires ground truth transcripts)
+    if "wer" in eval_types:
+        eval_types = [e for e in eval_types if e != "wer"]
+        print("⚠️  Skipping WER evaluation (requires transcripts file)")
+    
+    if not Path(file_path).exists():
+        raise FileNotFoundError(f"Audio file not found: {file_path}")
+
+    for eval_type in eval_types:
+        try:
+            print(f"\n🔍 Running {eval_type.upper()} evaluation...")
+            
+            if eval_type == "audiobox":
+                result = audiobox_eval.run_single_file(file_path)
+                print(f"📊 AudioBox metrics:")
+                print(f"    CE: {result.get('CE', 0):.3f}")
+                print(f"    CU: {result.get('CU', 0):.3f}")
+                print(f"    PC: {result.get('PC', 0):.3f}")
+                print(f"    PQ: {result.get('PQ', 0):.3f}")
+                
+            elif eval_type == "vad":
+                result = vad_eval.run_single_file(file_path)
+                print(f"📊 VAD metrics:")
+                print(f"    Max silence duration: {result.get('max_silence_duration', 0):.2f}s")
+                print(f"    Silence to speech ratio: {result.get('silence_to_speech_ratio', 0):.2f}")
+                
+            elif eval_type == "pitch":
+                result = pitch_eval.run_single_file(file_path)
+                print(f"📊 Pitch metrics:")
+                print(f"    Max pitch: {result.get('max_pitch', 0):.1f}Hz")
+                print(f"    CV: {result.get('pitch_stability', 0):.2f}")
+                print(f"    Semitone jumps: {result.get('semitone_jumps', 0)}")
+                
+            elif eval_type == "nisqa":
+                result = nisqa_eval.run_single_file(file_path)
+                print(f"📊 NISQA metrics:")
+                print(f"    MOS score: {result.get('mos_score', 0):.2f}")
+                
+            else:
+                print(f"⚠️  Unknown evaluation type: {eval_type}")
+                
+        except Exception as e:
+            print(f"❌ Error running {eval_type} evaluation: {str(e)}")
+
+
 def main():
     import argparse
 
@@ -257,8 +309,11 @@ def main():
     )
     parser.add_argument(
         "--dataset",
-        required=True,
         help="Path to dataset directory",
+    )
+    parser.add_argument(
+        "--file",
+        help="Path to single .wav file to evaluate",
     )
     parser.add_argument(
         "--evals",
@@ -269,13 +324,26 @@ def main():
     )
 
     args = parser.parse_args()
+    
+    # Validate arguments
+    if not args.dataset and not args.file:
+        parser.error("Either --dataset or --file must be specified")
+    if args.dataset and args.file:
+        parser.error("Cannot specify both --dataset and --file")
 
-    # Run evaluations
-    asyncio.run(run_evaluations(
-        transcripts_file=args.transcripts,
-        dataset=args.dataset,
-        eval_types=args.evals,
-    ))
+    if args.file:
+        # Single file evaluation mode
+        run_single_file_evaluations(
+            file_path=args.file,
+            eval_types=args.evals,
+        )
+    else:
+        # Dataset evaluation mode
+        asyncio.run(run_evaluations(
+            transcripts_file=args.transcripts,
+            dataset=args.dataset,
+            eval_types=args.evals,
+        ))
 
     sys.exit(0)
 
