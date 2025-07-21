@@ -8,7 +8,7 @@ import numpy as np
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from audioevals.utils.audio import AudioData
-from audioevals.utils.nisqa import nisqa
+from audioevals.utils.nisqa.nisqa import Nisqa
 
 
 def run(
@@ -30,7 +30,7 @@ def run(
             ]
         }
     """
-    
+
     if transcripts_file is None:
         transcripts_path = Path(__file__).parent.parent / "transcripts.json"
     else:
@@ -71,15 +71,15 @@ def run(
             print(f"Processing {audio_filename}...")
 
             audio_data = AudioData.from_wav_file(str(audio_file))
-            
+
             # Delegate to run_audio_data for processing
             nisqa_result = run_audio_data(audio_data)
-            
+
             result["mos_score"] = nisqa_result["mos_score"]
-            
+
             mos_scores.append(nisqa_result["mos_score"])
             results["successful_evaluations"] += 1
-            
+
             print(f"  ✅ MOS score: {nisqa_result['mos_score']:.2f}")
 
         except Exception as e:
@@ -100,7 +100,7 @@ def run(
     if mos_scores:
         print(f"📊 Average MOS: {results['average_mos']:.2f}")
         print(f"📊 MOS range: {min(mos_scores):.2f} - {max(mos_scores):.2f}")
-        print(f"📊 Quality distribution:")
+        print("📊 Quality distribution:")
         excellent = sum(1 for s in mos_scores if s >= 4.0)
         good = sum(1 for s in mos_scores if 3.0 <= s < 4.0)
         fair = sum(1 for s in mos_scores if 2.0 <= s < 3.0)
@@ -135,10 +135,10 @@ def run_audio_data(audio_data: AudioData) -> Dict:
     result = {
         "mos_score": 0.0,
     }
-    
+
     # Get audio as float32 for NISQA processing
     audio_array = audio_data.get_1d_array(np.float32)
-    
+
     # NISQA expects 48kHz audio - resample if needed
     if audio_data.sample_rate != 48000:
         # Resample to 48kHz
@@ -147,25 +147,29 @@ def run_audio_data(audio_data: AudioData) -> Dict:
         sample_rate = 48000
     else:
         sample_rate = audio_data.sample_rate
-    
+
     # Run NISQA prediction
     # Use the default TTS model weights
-    pretrained_model_path = Path(__file__).parent.parent / "utils" / "nisqa" / "weights" / "nisqa_tts.tar"
-    
+    pretrained_model_path = (
+        Path(__file__).parent.parent / "utils" / "nisqa" / "weights" / "nisqa_tts.tar"
+    )
+
     try:
-        mos_score = nisqa.run_audio_data(
-            audio_array, 
+        mos_score = Nisqa.run_audio_data(
+            audio_array,
             sample_rate=sample_rate,
-            pretrained_model=str(pretrained_model_path)
+            pretrained_model=str(pretrained_model_path),
         )
         result["mos_score"] = float(mos_score)
     except Exception as e:
         # If pretrained model not found, try without specifying path (use default)
         if "not found" in str(e):
-            print(f"  ⚠️  Default model not found at {pretrained_model_path}, trying fallback...")
-            mos_score = nisqa.run_audio_data(audio_array, sample_rate=sample_rate)
+            print(
+                f"  ⚠️  Default model not found at {pretrained_model_path}, trying fallback..."
+            )
+            mos_score = Nisqa.run_audio_data(audio_array, sample_rate=sample_rate)
             result["mos_score"] = float(mos_score)
         else:
             raise e
-    
+
     return result
