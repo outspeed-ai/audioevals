@@ -8,9 +8,9 @@ from typing import Dict, List, Optional
 sys.path.append(str(Path(__file__).parent.parent))
 
 from audioevals.utils.common import normalize_text
-from audioevals.evals import audiobox_eval, wer_eval, vad_eval, pitch_eval
+from audioevals.evals import audiobox_eval, wer_eval, vad_eval, pitch_eval, nisqa_eval
 
-EVAL_TYPES = ["wer", "audiobox", "vad", "pitch"]
+EVAL_TYPES = ["wer", "audiobox", "vad", "pitch", "nisqa"]
 
 
 async def run_evaluations(
@@ -128,6 +128,25 @@ async def run_evaluations(
                                 "pitch_range": result["pitch_range"],
                                 "pitch_values": result["pitch_values"],
                                 "frame_size_ms": result["frame_size_ms"],
+                                "pitch_stability": result["pitch_stability"],
+                                "semitone_jumps": result["semitone_jumps"],
+                                "octave_errors": result["octave_errors"],
+                                "max_semitone_jump": result["max_semitone_jump"],
+                            }
+                            break
+
+            elif eval_type == "nisqa":
+                eval_results = nisqa_eval.run(
+                    audio_dir=str(audio_dir), transcripts_file=str(transcripts_path)
+                )
+
+                for result in eval_results["results"]:
+                    audio_file = result["audio_file"]
+
+                    for eval_item in results["evaluations"]:
+                        if eval_item["audio_file"] == audio_file:
+                            eval_item["nisqa"] = {
+                                "mos_score": result["mos_score"],
                             }
                             break
             else:
@@ -201,8 +220,25 @@ async def run_evaluations(
         if pitch_results:
             avg_mean_pitch = sum(r.get("mean_pitch", 0) for r in pitch_results) / len(pitch_results)
             avg_pitch_std = sum(r.get("pitch_std", 0) for r in pitch_results) / len(pitch_results)
-            frame_size = pitch_results[0].get("frame_size_ms", 10.0) if pitch_results else 10.0
-            print(f"🎵 Pitch: Average {avg_mean_pitch:.1f}Hz ±{avg_pitch_std:.1f}Hz, {frame_size:.1f}ms frames")
+            avg_stability = sum(r.get("pitch_stability", 0) for r in pitch_results) / len(pitch_results)
+            total_semitone_jumps = sum(r.get("semitone_jumps", 0) for r in pitch_results)
+            total_octave_errors = sum(r.get("octave_errors", 0) for r in pitch_results)
+            
+            print(f"🎵 Pitch: Average {avg_mean_pitch:.1f}Hz ±{avg_pitch_std:.1f}Hz, Stability CV={avg_stability:.2f}")
+            print(f"   Semitone jumps: {total_semitone_jumps}, Octave errors: {total_octave_errors}")
+
+    if "nisqa" in eval_types:
+        nisqa_results = [
+            item.get("nisqa", {})
+            for item in results["evaluations"]
+            if "nisqa" in item
+        ]
+        if nisqa_results:
+            mos_scores = [r.get("mos_score", 0) for r in nisqa_results]
+            avg_mos = sum(mos_scores) / len(mos_scores)
+            excellent = sum(1 for s in mos_scores if s >= 4.0)
+            good = sum(1 for s in mos_scores if 3.0 <= s < 4.0)
+            print(f"🎯 NISQA: Average MOS {avg_mos:.2f}, Excellent: {excellent}/{len(mos_scores)}, Good: {good}/{len(mos_scores)}")
 
     print(f"\n💾 Results saved to: {results_file}")
 
