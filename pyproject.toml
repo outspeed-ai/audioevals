@@ -32,5 +32,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "ipykernel>=6.30.0",
     "jupyter>=1.1.1",
 ]
