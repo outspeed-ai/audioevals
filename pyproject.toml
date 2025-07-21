@@ -1,6 +1,6 @@
 [project]
 name = "audioevals"
-version = "0.5.0"
+version = "0.6.0"
 description = "Effective evaluations for Text-to-Speech (TTS) systems"
 readme = "README.md"
 authors = [
@@ -12,12 +12,15 @@ dependencies = [
     "audiobox-aesthetics>=0.0.4",
     "av>=15.0.0",
     "jiwer>=4.0.0",
+    "librosa>=0.11.0",
     "numpy>=2.2.1",
     "onnxruntime>=1.22.1",
+    "pandas>=2.3.1",
     "praat-parselmouth>=0.4.6",
     "pydub>=0.25.1",
     "soundfile>=0.13.1",
     "soxr>=0.5.0.post1",
+    "tqdm>=4.67.1",
 ]
 
 [project.scripts]
