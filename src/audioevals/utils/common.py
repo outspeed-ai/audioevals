@@ -47,6 +47,11 @@ async def request_deepgram_stt(
             ) as response:
                 json_response = await response.json()
                 
+                # Handle Deepgram API errors
+                if "results" not in json_response:
+                    print(f"Deepgram API Error: {json_response.get('err_msg', 'Unknown error')}")
+                    return None
+                
                 # Extract transcript and word-level timestamps
                 alternative = json_response["results"]["channels"][0]["alternatives"][0]
                 transcript = alternative["transcript"]

@@ -8,9 +8,9 @@ from typing import Dict, List, Optional
 sys.path.append(str(Path(__file__).parent.parent))
 
 from audioevals.utils.common import normalize_text
-from audioevals.evals import audiobox_eval, wer_eval, vad_eval
+from audioevals.evals import audiobox_eval, wer_eval, vad_eval, pitch_eval
 
-EVAL_TYPES = ["wer", "audiobox", "vad"]
+EVAL_TYPES = ["wer", "audiobox", "vad", "pitch"]
 
 
 async def run_evaluations(
@@ -81,9 +81,11 @@ async def run_evaluations(
 
                 for result in eval_results["results"]:
                     audio_file = result["audio_file"]
+                    audio_file_name = Path(audio_file).name
 
                     for eval_item in results["evaluations"]:
-                        if eval_item["audio_file"] == audio_file:
+                        eval_file_name = Path(eval_item["audio_file"]).name
+                        if eval_file_name == audio_file_name:
                             eval_item["audiobox"] = {
                                 "CE": result["CE"],
                                 "CU": result["CU"],
@@ -105,6 +107,27 @@ async def run_evaluations(
                             eval_item["vad"] = {
                                 "max_silence_duration": result["max_silence_duration"],
                                 "silence_to_speech_ratio": result["silence_to_speech_ratio"],
+                            }
+                            break
+
+            elif eval_type == "pitch":
+                eval_results = pitch_eval.run(
+                    audio_dir=str(audio_dir), transcripts_file=str(transcripts_path)
+                )
+
+                for result in eval_results["results"]:
+                    audio_file = result["audio_file"]
+
+                    for eval_item in results["evaluations"]:
+                        if eval_item["audio_file"] == audio_file:
+                            eval_item["pitch"] = {
+                                "mean_pitch": result["mean_pitch"],
+                                "pitch_std": result["pitch_std"],
+                                "pitch_min": result["pitch_min"],
+                                "pitch_max": result["pitch_max"],
+                                "pitch_range": result["pitch_range"],
+                                "pitch_values": result["pitch_values"],
+                                "frame_size_ms": result["frame_size_ms"],
                             }
                             break
             else:
@@ -168,6 +191,18 @@ async def run_evaluations(
             avg_max_silence = sum(r.get("max_silence_duration", 0) for r in vad_results) / len(vad_results)
             avg_silence_ratio = sum(r.get("silence_to_speech_ratio", 0) for r in vad_results) / len(vad_results)
             print(f"🔇 VAD: Average max silence {avg_max_silence:.2f}s, Silence/Speech ratio {avg_silence_ratio:.2f}")
+
+    if "pitch" in eval_types:
+        pitch_results = [
+            item.get("pitch", {})
+            for item in results["evaluations"]
+            if "pitch" in item
+        ]
+        if pitch_results:
+            avg_mean_pitch = sum(r.get("mean_pitch", 0) for r in pitch_results) / len(pitch_results)
+            avg_pitch_std = sum(r.get("pitch_std", 0) for r in pitch_results) / len(pitch_results)
+            frame_size = pitch_results[0].get("frame_size_ms", 10.0) if pitch_results else 10.0
+            print(f"🎵 Pitch: Average {avg_mean_pitch:.1f}Hz ±{avg_pitch_std:.1f}Hz, {frame_size:.1f}ms frames")
 
     print(f"\n💾 Results saved to: {results_file}")
 

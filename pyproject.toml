@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Sayan Jyoti Das", email = "sayanjyotidasworkmail@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.12.14",
     "audiobox-aesthetics>=0.0.4",
@@ -14,6 +14,7 @@ dependencies = [
     "jiwer>=4.0.0",
     "numpy>=2.3.1",
     "onnxruntime>=1.22.1",
+    "praat-parselmouth>=0.4.6",
     "pydub>=0.25.1",
     "soundfile>=0.13.1",
     "soxr>=0.5.0.post1",
@@ -25,3 +26,8 @@ audioevals = "audioevals.run_evals:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+]
