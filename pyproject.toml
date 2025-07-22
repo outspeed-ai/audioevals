@@ -1,6 +1,6 @@
 [project]
 name = "audioevals"
-version = "0.6.1"
+version = "0.6.2"
 description = "Effective evaluations for Text-to-Speech (TTS) systems"
 readme = "README.md"
 authors = [
@@ -29,6 +29,16 @@ audioevals = "audioevals.run_evals:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/audioevals"]
+
+[tool.hatchling.build]
+exclude = [
+    "tests/",
+    "data/",
+    "data/*"
+]
 
 [dependency-groups]
 dev = [
