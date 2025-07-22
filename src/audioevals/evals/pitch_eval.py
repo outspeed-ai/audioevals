@@ -41,7 +41,7 @@ def run(
             ]
         }
     """
-    
+
     if transcripts_file is None:
         transcripts_path = Path(__file__).parent.parent / "transcripts.json"
     else:
@@ -93,16 +93,18 @@ def run(
             print(f"Processing {audio_filename}...")
 
             audio_data = AudioData.from_wav_file(str(audio_file))
-            
+
             pitch_result = run_audio_data(audio_data)
-            
+
             result.update(pitch_result)
-            
+
             mean_pitches.append(pitch_result["mean_pitch"])
             pitch_stds.append(pitch_result["pitch_std"])
             results["successful_evaluations"] += 1
-            
-            print(f"  ✅ Mean pitch: {pitch_result['mean_pitch']:.1f}Hz | CV: {pitch_result['pitch_stability']:.2f} | Jumps: {pitch_result['semitone_jumps']} | Octave errors: {pitch_result['octave_errors']}")
+
+            print(
+                f"  ✅ Mean pitch: {pitch_result['mean_pitch']:.1f}Hz | CV: {pitch_result['pitch_stability']:.2f} | Jumps: {pitch_result['semitone_jumps']} | Octave errors: {pitch_result['octave_errors']}"
+            )
 
         except Exception as e:
             error_msg = str(e)
@@ -129,7 +131,7 @@ def run(
     return results
 
 
-def run_single_file(audio_file_path: str) -> Dict:
+def run_single_file(audio_file_path: str, time_step: Optional[float] = None) -> Dict:
     """
     Returns:
         {
@@ -147,10 +149,10 @@ def run_single_file(audio_file_path: str) -> Dict:
         }
     """
     audio_data = AudioData.from_wav_file(audio_file_path)
-    return run_audio_data(audio_data)
+    return run_audio_data(audio_data, time_step)
 
 
-def run_audio_data(audio_data: AudioData) -> Dict:
+def run_audio_data(audio_data: AudioData, time_step: Optional[float] = None) -> Dict:
     """
     Returns:
         {
@@ -180,50 +182,54 @@ def run_audio_data(audio_data: AudioData) -> Dict:
         "octave_errors": 0,
         "max_semitone_jump": 0.0,
     }
-    
+
     audio_array = audio_data.get_1d_array(np.float32)
-    
+
     sound = parselmouth.Sound(audio_array, sampling_frequency=audio_data.sample_rate)
-    pitch = sound.to_pitch()
-    
-    pitch_values = pitch.selected_array['frequency']
+    if time_step is None:
+        pitch = sound.to_pitch()
+    else:
+        pitch = sound.to_pitch(time_step=time_step)
+
+    pitch_values = pitch.selected_array["frequency"]
     result["pitch_values"] = pitch_values.tolist()
-    
+
     # Calculate frame size in ms
     if len(pitch_values) > 0:
         result["frame_size_ms"] = pitch.time_step * 1000.0
-    
+
     voiced_pitch_values = pitch_values[pitch_values > 0]
-    
+
     if len(voiced_pitch_values) > 0:
         result["mean_pitch"] = float(np.mean(voiced_pitch_values))
         result["pitch_std"] = float(np.std(voiced_pitch_values))
         result["pitch_min"] = float(np.min(voiced_pitch_values))
         result["pitch_max"] = float(np.max(voiced_pitch_values))
         result["pitch_range"] = result["pitch_max"] - result["pitch_min"]
-        
+
         # Calculate pitch stability using coefficient of variation
         if result["mean_pitch"] > 0:
             cv = result["pitch_std"] / result["mean_pitch"]
             result["pitch_stability"] = float(cv)
-        
+
         # Calculate semitone jumps to detect octave errors
-        semitone_jumps, octave_errors, max_jump = _calculate_semitone_jumps(voiced_pitch_values)
+        semitone_jumps, octave_errors, max_jump = _calculate_semitone_jumps(
+            voiced_pitch_values
+        )
         result["semitone_jumps"] = semitone_jumps
         result["octave_errors"] = octave_errors
         result["max_semitone_jump"] = max_jump
-    
-    return result
 
+    return result
 
 
 def _calculate_semitone_jumps(pitch_values: np.ndarray) -> tuple[int, int, float]:
     """
     Calculate semitone jumps between consecutive pitch values to detect artifacts.
-    
+
     Args:
         pitch_values: Array of pitch values in Hz (only voiced frames)
-        
+
     Returns:
         tuple: (semitone_jumps, octave_errors, max_semitone_jump)
             - semitone_jumps: number of jumps > 2 semitones
@@ -232,29 +238,29 @@ def _calculate_semitone_jumps(pitch_values: np.ndarray) -> tuple[int, int, float
     """
     if len(pitch_values) < 2:
         return 0, 0, 0.0
-    
+
     # Convert Hz to semitones for analysis
     # Semitone difference = 12 * log2(f2/f1)
     semitone_diffs = []
-    
+
     for i in range(1, len(pitch_values)):
-        if pitch_values[i] > 0 and pitch_values[i-1] > 0:  # Both frames voiced
+        if pitch_values[i] > 0 and pitch_values[i - 1] > 0:  # Both frames voiced
             # Calculate semitone difference
-            ratio = pitch_values[i] / pitch_values[i-1]
+            ratio = pitch_values[i] / pitch_values[i - 1]
             if ratio > 0:
                 semitone_diff = abs(12 * np.log2(ratio))
                 semitone_diffs.append(semitone_diff)
-    
+
     if not semitone_diffs:
         return 0, 0, 0.0
-    
+
     semitone_diffs = np.array(semitone_diffs)
-    
+
     # Count jumps based on research-backed thresholds:
     # > 2 semitones: potentially unnatural (large jump threshold)
     # > 8 semitones: likely octave error or catastrophic failure
     semitone_jumps = int(np.sum(semitone_diffs > 2.0))
     octave_errors = int(np.sum(semitone_diffs > 8.0))
     max_semitone_jump = float(np.max(semitone_diffs))
-    
+
     return semitone_jumps, octave_errors, max_semitone_jump
