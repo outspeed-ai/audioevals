@@ -42,9 +42,10 @@ Detects unnaturally long silences in generated audio using Silero VAD with RMS a
 **Output format:**
 ```json
 {
-    "max_silence_duration": 0.64,
     "total_duration": 12.45,
-    "silence_to_speech_ratio": 0.12
+    "max_silence_duration": 0.64,
+    "silence_to_speech_ratio": 0.12,
+    "silence_ratio": 0.05
 }
 ```
 

@@ -27,6 +27,7 @@ def run(
                     "audio_file": str,
                     "max_silence_duration": float,  # in seconds
                     "silence_to_speech_ratio": float,  # total_silence_duration / total_speech_duration
+                    "silence_ratio": float,  # total_silence_duration / total_duration
                 }
             ]
         }
@@ -59,6 +60,7 @@ def run(
 
     max_silence_durations = []
     silence_to_speech_ratios = []
+    silence_ratios = []
 
     # Process each audio file
     for audio_filename, _ in ground_truth_transcripts.items():
@@ -68,6 +70,7 @@ def run(
             "audio_file": str(audio_file),
             "max_silence_duration": 0.0,
             "silence_to_speech_ratio": 0.0,
+            "silence_ratio": 0.0,
         }
 
         try:
@@ -80,9 +83,11 @@ def run(
             
             result["max_silence_duration"] = vad_result["max_silence_duration"]
             result["silence_to_speech_ratio"] = vad_result["silence_to_speech_ratio"]
+            result["silence_ratio"] = vad_result["silence_ratio"]
             
             max_silence_durations.append(vad_result["max_silence_duration"])
             silence_to_speech_ratios.append(vad_result["silence_to_speech_ratio"])
+            silence_ratios.append(vad_result["silence_ratio"])
             results["successful_evaluations"] += 1
             
             print(f"  ✅ Max silence: {vad_result['max_silence_duration']:.2f}s | Silence/Speech ratio: {vad_result['silence_to_speech_ratio']:.2f}")
@@ -108,12 +113,14 @@ def run(
         print(f"📊 Longest max silence: {max(max_silence_durations):.2f}s")
     if silence_to_speech_ratios:
         print(f"📊 Average silence/speech ratio: {sum(silence_to_speech_ratios) / len(silence_to_speech_ratios):.2f}")
+    if silence_ratios:
+        print(f"📊 Average silence ratio: {sum(silence_ratios) / len(silence_ratios):.2f}")
     print("-" * 50)
 
     return results
 
 
-def calculate_silence_metrics(speech_detection_results: List[bool], chunk_duration_ms: int = 32) -> tuple[float, float]:
+def calculate_silence_metrics(speech_detection_results: List[bool], chunk_duration_ms: int = 32) -> tuple[float, float, float]:
     if not speech_detection_results:
         return 0.0, 0.0
     
@@ -138,8 +145,11 @@ def calculate_silence_metrics(speech_detection_results: List[bool], chunk_durati
         silence_to_speech_ratio = total_silence_chunks / total_speech_chunks
     else:
         silence_to_speech_ratio = float('inf') if total_silence_chunks > 0 else 0.0
+
+    # silence ratio
+    silence_ratio = total_silence_chunks / len(speech_detection_results)
     
-    return max_silence_duration, silence_to_speech_ratio
+    return max_silence_duration, silence_to_speech_ratio, silence_ratio
 
 
 def run_single_file(audio_file_path: str) -> Dict:
@@ -149,6 +159,7 @@ def run_single_file(audio_file_path: str) -> Dict:
             "max_silence_duration": float,
             "total_duration": float,
             "silence_to_speech_ratio": float,
+            "silence_ratio": float,
         }
     """
     audio_data = AudioData.from_wav_file(audio_file_path)
@@ -162,12 +173,14 @@ def run_audio_data(audio_data: AudioData) -> Dict:
             "max_silence_duration": float,
             "total_duration": float,
             "silence_to_speech_ratio": float,
+            "silence_ratio": float,
         }
     """
     result = {
         "max_silence_duration": 0.0,
         "total_duration": 0.0,
         "silence_to_speech_ratio": 0.0,
+        "silence_ratio": 0.0,
     }
     
     # Resample to 16kHz if needed
@@ -209,11 +222,12 @@ def run_audio_data(audio_data: AudioData) -> Dict:
             speech_detection_results.append(is_speech)
     
     # Calculate silence and speech durations
-    max_silence_duration, silence_to_speech_ratio = calculate_silence_metrics(
+    max_silence_duration, silence_to_speech_ratio, silence_ratio = calculate_silence_metrics(
         speech_detection_results, chunk_duration_ms=32
     )
     
     result["max_silence_duration"] = max_silence_duration
     result["silence_to_speech_ratio"] = silence_to_speech_ratio
-    
+    result["silence_ratio"] = silence_ratio
+
     return result

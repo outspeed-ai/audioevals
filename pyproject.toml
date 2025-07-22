@@ -1,6 +1,6 @@
 [project]
 name = "audioevals"
-version = "0.6.2"
+version = "0.6.3"
 description = "Effective evaluations for Text-to-Speech (TTS) systems"
 readme = "README.md"
 authors = [

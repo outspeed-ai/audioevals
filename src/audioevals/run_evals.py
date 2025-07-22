@@ -107,6 +107,7 @@ async def run_evaluations(
                             eval_item["vad"] = {
                                 "max_silence_duration": result["max_silence_duration"],
                                 "silence_to_speech_ratio": result["silence_to_speech_ratio"],
+                                "silence_ratio": result["silence_ratio"],
                             }
                             break
 
@@ -209,7 +210,7 @@ async def run_evaluations(
         if vad_results:
             avg_max_silence = sum(r.get("max_silence_duration", 0) for r in vad_results) / len(vad_results)
             avg_silence_ratio = sum(r.get("silence_to_speech_ratio", 0) for r in vad_results) / len(vad_results)
-            print(f"🔇 VAD: Average max silence {avg_max_silence:.2f}s, Silence/Speech ratio {avg_silence_ratio:.2f}")
+            print(f"🔇 VAD: Average max silence {avg_max_silence:.2f}s, Silence/Speech ratio {avg_silence_ratio:.2f}, Silence ratio {avg_silence_ratio:.2f}")
 
     if "pitch" in eval_types:
         pitch_results = [
@@ -275,6 +276,7 @@ def run_single_file_evaluations(
                 print(f"📊 VAD metrics:")
                 print(f"    Max silence duration: {result.get('max_silence_duration', 0):.2f}s")
                 print(f"    Silence to speech ratio: {result.get('silence_to_speech_ratio', 0):.2f}")
+                print(f"    Silence ratio: {result.get('silence_ratio', 0):.2f}")
                 
             elif eval_type == "pitch":
                 result = pitch_eval.run_single_file(file_path)
